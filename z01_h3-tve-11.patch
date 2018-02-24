@@ -1,0 +1,959 @@
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/arch/arm/boot/dts/overlay/Makefile linux-4.14.y-tve/arch/arm/boot/dts/overlay/Makefile
+--- linux-4.14.y/arch/arm/boot/dts/overlay/Makefile	2018-02-20 10:42:18.000000000 +0800
++++ linux-4.14.y-tve/arch/arm/boot/dts/overlay/Makefile	2018-02-20 20:07:56.193893833 +0800
+@@ -69,7 +69,8 @@
+ 	sun8i-h3-usbhost1.dtbo \
+ 	sun8i-h3-usbhost2.dtbo \
+ 	sun8i-h3-usbhost3.dtbo \
+-	sun8i-h3-w1-gpio.dtbo
++	sun8i-h3-w1-gpio.dtbo \
++	sun8i-h3-tve.dtbo
+ 
+ scr-$(CONFIG_MACH_SUN4I) += sun4i-a10-fixup.scr
+ scr-$(CONFIG_MACH_SUN7I) += sun7i-a20-fixup.scr
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/arch/arm/boot/dts/overlay/README.sun8i-h3-overlays linux-4.14.y-tve/arch/arm/boot/dts/overlay/README.sun8i-h3-overlays
+--- linux-4.14.y/arch/arm/boot/dts/overlay/README.sun8i-h3-overlays	2018-02-20 10:42:18.000000000 +0800
++++ linux-4.14.y-tve/arch/arm/boot/dts/overlay/README.sun8i-h3-overlays	2018-02-20 20:07:02.763208084 +0800
+@@ -34,6 +34,7 @@
+ - usbhost2
+ - usbhost3
+ - w1-gpio
++- tve
+ 
+ ### Overlay details:
+ 
+@@ -248,3 +249,12 @@
+ 	Set to 1 to enable the pull-up
+ 	This option should not be used with multiple devices, parasite power setup
+ 		or long wires -	please use external pull-up resistor instead
++
++### tve
++
++Activates Composite TV Encoder
++
++Parameters:
++	Unknown at this stage. 
++	Maybe none. 
++	Not sure how to change the mode between PAL/NTSC.
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/arch/arm/boot/dts/overlay/sun8i-h3-tve.dts linux-4.14.y-tve/arch/arm/boot/dts/overlay/sun8i-h3-tve.dts
+--- linux-4.14.y/arch/arm/boot/dts/overlay/sun8i-h3-tve.dts	1970-01-01 07:30:00.000000000 +0730
++++ linux-4.14.y-tve/arch/arm/boot/dts/overlay/sun8i-h3-tve.dts	2018-02-23 19:09:28.156463775 +0800
+@@ -0,0 +1,34 @@
++/dts-v1/;
++/plugin/;
++
++/ {
++	compatible = "allwinner,sun8i-h3";
++	
++	fragment@0 {
++		target = <&de>;
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@1 {
++		target = <&mixer1>;
++		__overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@2 {
++		target = <&tcon1>;
++		 __overlay__ {
++			status = "okay";
++		};
++	};
++
++	fragment@3 {
++		target = <&tve0>;
++		__overlay__ {
++			status = "okay";
++		};
++	};
++};
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/arch/arm/boot/dts/sun8i-h3.dtsi linux-4.14.y-tve/arch/arm/boot/dts/sun8i-h3.dtsi
+--- linux-4.14.y/arch/arm/boot/dts/sun8i-h3.dtsi	2018-02-20 10:42:15.000000000 +0800
++++ linux-4.14.y-tve/arch/arm/boot/dts/sun8i-h3.dtsi	2018-02-23 19:09:28.124464455 +0800
+@@ -42,6 +42,8 @@
+ 
+ #include "sunxi-h3-h5.dtsi"
+ #include <dt-bindings/thermal/thermal.h>
++#include <dt-bindings/clock/sun8i-de2.h>
++#include <dt-bindings/reset/sun8i-de2.h>
+ 
+ / {
+ 	cpu_opp_table: opp_table {
+@@ -280,6 +282,191 @@
+ 		};
+ 	};
+ 
++	de: display-engine {
++		compatible = "allwinner,sun8i-h3-display-engine";
++		allwinner,pipelines = <&mixer0>,
++				      <&mixer1>;
++		status = "disabled";
++	};
++
++	soc {
++		display_clocks: clock@1000000 {
++			compatible = "allwinner,sun8i-a83t-de2-clk";
++			reg = <0x01000000 0x100000>;
++			clocks = <&ccu CLK_BUS_DE>,
++				 <&ccu CLK_DE>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&ccu RST_BUS_DE>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			assigned-clocks = <&ccu CLK_DE>;
++			assigned-clock-parents = <&ccu CLK_PLL_DE>;
++			assigned-clock-rates = <432000000>;
++		};
++
++		mixer0: mixer@1100000 {
++			compatible = "allwinner,sun8i-h3-de2-mixer0";
++			reg = <0x01100000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER0>,
++				 <&display_clocks CLK_MIXER0>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_MIXER0>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer0_out: port@1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					mixer0_out_tcon0: endpoint@0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_mixer0>;
++					};
++
++					mixer0_out_tcon1: endpoint@1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_in_mixer0>;
++					};
++				};
++			};
++		};
++
++		mixer1: mixer@1200000 {
++			compatible = "allwinner,sun8i-h3-de2-mixer1";
++			reg = <0x01200000 0x100000>;
++			clocks = <&display_clocks CLK_BUS_MIXER1>,
++				 <&display_clocks CLK_MIXER1>;
++			clock-names = "bus",
++				      "mod";
++			resets = <&display_clocks RST_WB>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				mixer1_out: port@1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					mixer1_out_tcon0: endpoint@0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_mixer1>;
++					};
++
++					mixer1_out_tcon1: endpoint@1 {
++						reg = <1>;
++						remote-endpoint = <&tcon1_in_mixer1>;
++					};
++				};
++			};
++		};
++
++		tcon0: lcd-controller@1c0c000 {
++			compatible = "allwinner,sun8i-h3-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON0>,
++				 <&ccu CLK_TCON0>;
++			clock-names = "ahb",
++				      "tcon-ch1";
++			resets = <&ccu RST_BUS_TCON0>;
++			reset-names = "lcd";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port@0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_mixer0: endpoint@0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon0>;
++					};
++
++					tcon0_in_mixer1: endpoint@1 {
++						reg = <1>;
++						remote-endpoint = <&mixer1_out_tcon0>;
++					};
++				};
++			};
++		};
++
++		tcon1: lcd-controller@1c0d000 {
++			compatible = "allwinner,sun8i-h3-tcon";
++			reg = <0x01c0d000 0x1000>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&ccu CLK_BUS_TCON1>,
++				 <&ccu CLK_TVE>;
++			clock-names = "ahb",
++				      "tcon-ch1";
++			resets = <&ccu RST_BUS_TCON1>;
++			reset-names = "lcd";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon1_in: port@0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon1_in_mixer0: endpoint@0 {
++						reg = <0>;
++						remote-endpoint = <&mixer0_out_tcon1>;
++					};
++
++					tcon1_in_mixer1: endpoint@1 {
++						reg = <1>;
++						remote-endpoint = <&mixer1_out_tcon1>;
++					};
++				};
++
++				tcon1_out: port@1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					tcon1_out_tve0: endpoint@1 {
++						reg = <1>;
++						remote-endpoint = <&tve0_in_tcon1>;
++					};
++				};
++			};
++		};
++
++		tve0: tv-encoder@1e00000 {
++			compatible = "allwinner,sun8i-h3-tv-encoder";
++			reg = <0x01e00000 0x1000>;
++			clocks = <&ccu CLK_BUS_TVE>;
++			resets = <&ccu RST_BUS_TVE>;
++			status = "disabled";
++
++			port {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tve0_in_tcon1: endpoint@0 {
++					reg = <0>;
++					remote-endpoint = <&tcon1_out_tve0>;
++				};
++			};
++		};
++	};
++
+ 	timer {
+ 		compatible = "arm,armv7-timer";
+ 		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt linux-4.14.y-tve/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+--- linux-4.14.y/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt	2018-02-20 10:42:18.000000000 +0800
++++ linux-4.14.y-tve/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt	2018-02-20 18:48:28.344412523 +0800
+@@ -67,7 +67,9 @@
+ the pipeline.
+ 
+ Required properties:
+- - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
++ - compatible: value must be either:
++    * allwinner,sun4i-a10-tv-encoder
++    * allwinner,sun8i-h3-tv-encoder
+  - reg: base address and size of memory-mapped region
+  - clocks: the clocks driving the TV encoder
+  - resets: phandle to the reset controller driving the encoder
+@@ -105,6 +107,11 @@
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoint, the second one the output
+ 
++  In the situation of Display Engine 2.0 that the connection between
++  the mixer and the TCON can be swapped, the input should have two
++  endpoints. The first input endpoint should be connected to mixer0
++  and the second should be connected to mixer1.
++
+   The output may have multiple endpoints. The TCON has two channels,
+   usually with the first channel being used for the panels interfaces
+   (RGB, LVDS, etc.), and the second being used for the outputs that
+@@ -241,6 +248,11 @@
+   Documentation/devicetree/bindings/media/video-interfaces.txt. The
+   first port should be the input endpoints, the second one the output
+ 
++  In the situation of Display Engine 2.0 that the connection between
++  the mixer and the TCON can be swapped, the output should have two
++  endpoints. The first should be connected to TCON0 and the second
++  should be connected to TCON1.
++  
+ Display Engine Pipeline
+ -----------------------
+ 
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_drv.c linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_drv.c
+--- linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_drv.c	2018-02-20 10:42:15.000000000 +0800
++++ linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_drv.c	2018-02-23 11:03:39.755198956 +0800
+@@ -209,6 +209,13 @@
+ 		of_device_is_compatible(node, "allwinner,sun8i-a33-display-frontend");
+ }
+ 
++static bool sun4i_drv_node_is_swappable_de2_mixer(struct device_node *node)
++{
++	/* The V3s has only one mixer-tcon pair, so it's not listed here. */
++	return of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer0") ||
++		of_device_is_compatible(node, "allwinner,sun8i-h3-de2-mixer1");
++}
++
+ static bool sun4i_drv_node_is_tcon(struct device_node *node)
+ {
+ 	return of_device_is_compatible(node, "allwinner,sun5i-a13-tcon") ||
+@@ -235,6 +242,8 @@
+ 	struct device_node *port, *ep, *remote;
+ 	int count = 0;
+ 
++	DRM_DEBUG_DRIVER("sun4i_drv_add_endpoints - Adding endpoint %s:%s:%s\n", node->name, node->type, node->full_name);
++
+ 	/*
+ 	 * We don't support the frontend for now, so we will never
+ 	 * have a device bound. Just skip over it, but we still want
+@@ -244,6 +253,8 @@
+ 	    !of_device_is_available(node))
+ 		return 0;
+ 
++	DRM_DEBUG_DRIVER("sun4i_drv_add_endpoints - 2\n");
++
+ 	/*
+ 	 * The connectors will be the last nodes in our pipeline, we
+ 	 * can just bail out.
+@@ -251,12 +262,16 @@
+ 	if (sun4i_drv_node_is_connector(node))
+ 		return 0;
+ 
++	DRM_DEBUG_DRIVER("sun4i_drv_add_endpoints - 3\n");
++
+ 	if (!sun4i_drv_node_is_frontend(node)) {
+ 		/* Add current component */
+ 		DRM_DEBUG_DRIVER("Adding component %pOF\n", node);
+ 		drm_of_component_match_add(dev, match, compare_of, node);
+ 		count++;
+ 	}
++	
++	DRM_DEBUG_DRIVER("sun4i_drv_add_endpoints - 4\n");
+ 
+ 	/* Inputs are listed first, then outputs */
+ 	port = of_graph_get_port_by_id(node, 1);
+@@ -265,6 +280,8 @@
+ 		return count;
+ 	}
+ 
++	DRM_DEBUG_DRIVER("sun4i_drv_add_endpoints - 5\n");
++
+ 	for_each_available_child_of_node(port, ep) {
+ 		remote = of_graph_get_remote_port_parent(ep);
+ 		if (!remote) {
+@@ -292,6 +309,44 @@
+ 			}
+ 		}
+ 
++		/*
++		 * The second endpoint of the output of a swappable DE2 mixer
++		 * is the TCON after connection swapping.
++		 * Ignore it now, as we now hardcode mixer0->tcon0,
++		 * mixer1->tcon1 connection.
++		 */
++		if (sun4i_drv_node_is_swappable_de2_mixer(node)) {
++			struct device_node *remote_ep_node;
++			struct of_endpoint local_endpoint, remote_endpoint;
++
++			remote_ep_node = of_graph_get_remote_endpoint(ep);
++			if (!remote_ep_node) {
++				DRM_DEBUG_DRIVER("Couldn't get remote endpoint\n");
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(ep, &local_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse local endpoint\n");
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(remote_ep_node,
++						    &remote_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse remote endpoint\n");
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (local_endpoint.id != remote_endpoint.id) {
++				DRM_DEBUG_DRIVER("Endpoint is an unused connection for DE2 mixer... skipping\n");
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			of_node_put(remote_ep_node);
++		}
++
+ 		/* Walk down our tree */
+ 		count += sun4i_drv_add_endpoints(dev, match, remote);
+ 
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_tcon.c linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_tcon.c
+--- linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_tcon.c	2018-02-20 10:42:14.000000000 +0800
++++ linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_tcon.c	2018-02-23 22:16:10.323103175 +0800
+@@ -115,6 +115,7 @@
+ 			struct drm_encoder *encoder)
+ {
+ 	u32 val;
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_set_mux\n");
+ 
+ 	if (!tcon->quirks->has_unknown_mux)
+ 		return;
+@@ -138,6 +139,8 @@
+ 				    int channel)
+ {
+ 	int delay = mode->vtotal - mode->vdisplay;
++	
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_get_clk_delay\n");
+ 
+ 	if (mode->flags & DRM_MODE_FLAG_INTERLACE)
+ 		delay /= 2;
+@@ -158,11 +161,14 @@
+ 	unsigned int bp, hsync, vsync;
+ 	u8 clk_delay;
+ 	u32 val = 0;
++	
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon0_mode_set\n");
+ 
+ 	WARN_ON(!tcon->quirks->has_channel_0);
+ 
+ 	/* Configure the dot clock */
+ 	clk_set_rate(tcon->dclk, mode->crtc_clock * 1000);
++	WARN_ON(!tcon->quirks->has_channel_0);
+ 
+ 	/* Adjust clock delay */
+ 	clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
+@@ -237,6 +243,8 @@
+ 	u8 clk_delay;
+ 	u32 val;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon1_mode_set\n");
++
+ 	WARN_ON(!tcon->quirks->has_channel_1);
+ 
+ 	/* Configure the dot clock */
+@@ -363,6 +371,8 @@
+ static int sun4i_tcon_init_clocks(struct device *dev,
+ 				  struct sun4i_tcon *tcon)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_init_clocks\n");
++
+ 	tcon->clk = devm_clk_get(dev, "ahb");
+ 	if (IS_ERR(tcon->clk)) {
+ 		dev_err(dev, "Couldn't get the TCON bus clock\n");
+@@ -391,6 +401,7 @@
+ 
+ static void sun4i_tcon_free_clocks(struct sun4i_tcon *tcon)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_free_clocks\n");
+ 	clk_disable_unprepare(tcon->clk);
+ }
+ 
+@@ -400,6 +411,8 @@
+ 	struct platform_device *pdev = to_platform_device(dev);
+ 	int irq, ret;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_init_irq\n");
++
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+ 		dev_err(dev, "Couldn't retrieve the TCON interrupt\n");
+@@ -430,6 +443,8 @@
+ 	struct resource *res;
+ 	void __iomem *regs;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_init_regmap\n");
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(regs))
+@@ -470,11 +485,14 @@
+  * requested via the get_id function of the engine.
+  */
+ static struct sunxi_engine *sun4i_tcon_find_engine(struct sun4i_drv *drv,
+-						   struct device_node *node)
++						   struct device_node *node,
++						   bool skip_bonus_ep)
+ {
+ 	struct device_node *port, *ep, *remote;
+ 	struct sunxi_engine *engine;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_find_engine\n");
++
+ 	port = of_graph_get_port_by_id(node, 0);
+ 	if (!port)
+ 		return ERR_PTR(-EINVAL);
+@@ -484,6 +502,42 @@
+ 		if (!remote)
+ 			continue;
+ 
++		if (skip_bonus_ep) {
++			struct device_node *remote_ep_node;
++			struct of_endpoint local_endpoint, remote_endpoint;
++
++			remote_ep_node = of_graph_get_remote_endpoint(ep);
++			if (!remote_ep_node) {
++				DRM_DEBUG_DRIVER("Couldn't get remote endpoint\n");
++				of_node_put(remote);
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(ep, &local_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse local endpoint\n");
++				of_node_put(remote);
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (of_graph_parse_endpoint(remote_ep_node,
++						    &remote_endpoint)) {
++				DRM_DEBUG_DRIVER("Couldn't parse remote endpoint\n");
++				of_node_put(remote);
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			if (local_endpoint.id != remote_endpoint.id) {
++				DRM_DEBUG_DRIVER("Skipping bonus mixer->TCON connection when searching engine\n");
++				of_node_put(remote);
++				of_node_put(remote_ep_node);
++				continue;
++			}
++
++			of_node_put(remote_ep_node);
++		}
++
+ 		/* does this node match any registered engines? */
+ 		list_for_each_entry(engine, &drv->engine_list, list) {
+ 			if (remote == engine->node) {
+@@ -494,7 +548,7 @@
+ 		}
+ 
+ 		/* keep looking through upstream ports */
+-		engine = sun4i_tcon_find_engine(drv, remote);
++		engine = sun4i_tcon_find_engine(drv, remote, skip_bonus_ep);
+ 		if (!IS_ERR(engine)) {
+ 			of_node_put(remote);
+ 			of_node_put(port);
+@@ -514,11 +568,7 @@
+ 	struct sun4i_tcon *tcon;
+ 	int ret;
+ 
+-	engine = sun4i_tcon_find_engine(drv, dev->of_node);
+-	if (IS_ERR(engine)) {
+-		dev_err(dev, "Couldn't find matching engine\n");
+-		return -EPROBE_DEFER;
+-	}
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_bind\n");
+ 
+ 	tcon = devm_kzalloc(dev, sizeof(*tcon), GFP_KERNEL);
+ 	if (!tcon)
+@@ -526,9 +576,22 @@
+ 	dev_set_drvdata(dev, tcon);
+ 	tcon->drm = drm;
+ 	tcon->dev = dev;
+-	tcon->id = engine->id;
+ 	tcon->quirks = of_device_get_match_data(dev);
+ 
++	/*
++	 * As we keep the connection between DE2 mixer and TCON not swapped,
++	 * skip the bonus endpoints (which stand for swapped connection)
++	 * when finding the correspoing engine.
++	 */
++	engine = sun4i_tcon_find_engine(drv, dev->of_node,
++					tcon->quirks->swappable_input);
++	if (IS_ERR(engine)) {
++		dev_err(dev, "Couldn't find matching engine\n");
++		return -EPROBE_DEFER;
++	}
++
++	tcon->id = engine->id;
++	
+ 	tcon->lcd_rst = devm_reset_control_get(dev, "lcd");
+ 	if (IS_ERR(tcon->lcd_rst)) {
+ 		dev_err(dev, "Couldn't get our reset line\n");
+@@ -600,6 +663,7 @@
+ 			      void *data)
+ {
+ 	struct sun4i_tcon *tcon = dev_get_drvdata(dev);
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_unbind\n");
+ 
+ 	list_del(&tcon->list);
+ 
+@@ -619,6 +683,7 @@
+ 	struct drm_bridge *bridge;
+ 	struct drm_panel *panel;
+ 	int ret;
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_probe\n");
+ 
+ 	ret = drm_of_find_panel_or_bridge(node, 1, 0, &panel, &bridge);
+ 	if (ret == -EPROBE_DEFER)
+@@ -629,6 +694,7 @@
+ 
+ static int sun4i_tcon_remove(struct platform_device *pdev)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tcon_remove\n");
+ 	component_del(&pdev->dev, &sun4i_tcon_ops);
+ 
+ 	return 0;
+@@ -660,6 +726,7 @@
+ 
+ static const struct sun4i_tcon_quirks sun8i_h3_quirks = {
+ 	.has_channel_1	= true,
++	.swappable_input = true,
+ };
+ 
+ static const struct of_device_id sun4i_tcon_of_table[] = {
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_tcon.h linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_tcon.h
+--- linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_tcon.h	2018-02-20 10:42:14.000000000 +0800
++++ linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_tcon.h	2018-02-20 19:39:46.616068523 +0800
+@@ -147,6 +147,8 @@
+ 	bool	has_unknown_mux; /* sun5i has undocumented mux */
+ 	bool	has_channel_0;	/* some A83T+ TCONs don't have channel 0*/
+ 	bool	has_channel_1;	/* a33 does not have channel 1 */
++	/* Some DE2 can swap the mixer<->TCON connection */
++	bool	swappable_input;
+ };
+ 
+ struct sun4i_tcon {
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_tv.c linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_tv.c
+--- linux-4.14.y/drivers/gpu/drm/sun4i/sun4i_tv.c	2018-02-20 00:21:19.000000000 +0800
++++ linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun4i_tv.c	2018-02-22 22:08:33.023799078 +0800
+@@ -13,6 +13,7 @@
+ #include <linux/clk.h>
+ #include <linux/component.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/regmap.h>
+ #include <linux/reset.h>
+ 
+@@ -169,14 +170,21 @@
+ 	const struct resync_parameters	*resync_params;
+ };
+ 
++struct sun4i_tv_quirks {
++	int fixed_divider;
++};
++
+ struct sun4i_tv {
+ 	struct drm_connector	connector;
+ 	struct drm_encoder	encoder;
+ 
+ 	struct clk		*clk;
++	struct clk		*mod_clk;
+ 	struct regmap		*regs;
+ 	struct reset_control	*reset;
+ 
++	const struct sun4i_tv_quirks *quirks;
++
+ 	struct sun4i_drv	*drv;
+ };
+ 
+@@ -273,6 +281,8 @@
+ static inline struct sun4i_tv *
+ drm_encoder_to_sun4i_tv(struct drm_encoder *encoder)
+ {
++	DRM_DEBUG_DRIVER("TVE: drm_encoder_to_sun4i_tv\n");
++	
+ 	return container_of(encoder, struct sun4i_tv,
+ 			    encoder);
+ }
+@@ -280,6 +290,8 @@
+ static inline struct sun4i_tv *
+ drm_connector_to_sun4i_tv(struct drm_connector *connector)
+ {
++	DRM_DEBUG_DRIVER("TVE: drm_connector_to_sun4i_tv\n");
++	
+ 	return container_of(connector, struct sun4i_tv,
+ 			    connector);
+ }
+@@ -294,6 +306,7 @@
+ static const struct tv_mode *sun4i_tv_find_tv_by_mode(const struct drm_display_mode *mode)
+ {
+ 	int i;
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_find_tv_by_mode\n");
+ 
+ 	/* First try to identify the mode by name */
+ 	for (i = 0; i < ARRAY_SIZE(tv_modes); i++) {
+@@ -384,6 +397,14 @@
+ 	struct sun4i_tcon *tcon = crtc->tcon;
+ 	const struct tv_mode *tv_mode = sun4i_tv_find_tv_by_mode(mode);
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_mode_set\n");
++
++	if (tv->quirks->fixed_divider) {
++		DRM_DEBUG_DRIVER("Applying fixed divider %d on TVE clock\n",
++				 tv->quirks->fixed_divider);
++		mode->crtc_clock *= tv->quirks->fixed_divider;
++	}
++
+ 	sun4i_tcon1_mode_set(tcon, mode);
+ 	sun4i_tcon_set_mux(tcon, 1, encoder);
+ 
+@@ -489,6 +510,8 @@
+ 
+ static void sun4i_tv_destroy(struct drm_encoder *encoder)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_destroy\n");
++	
+ 	drm_encoder_cleanup(encoder);
+ }
+ 
+@@ -500,6 +523,8 @@
+ {
+ 	int i;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_comp_get_modes\n");
++
+ 	for (i = 0; i < ARRAY_SIZE(tv_modes); i++) {
+ 		struct drm_display_mode *mode;
+ 		const struct tv_mode *tv_mode = &tv_modes[i];
+@@ -522,6 +547,8 @@
+ static int sun4i_tv_comp_mode_valid(struct drm_connector *connector,
+ 				    struct drm_display_mode *mode)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_comp_mode_valid\n");
++	
+ 	/* TODO */
+ 	return MODE_OK;
+ }
+@@ -534,6 +561,8 @@
+ static void
+ sun4i_tv_comp_connector_destroy(struct drm_connector *connector)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_comp_connector_destroy\n");
++
+ 	drm_connector_cleanup(connector);
+ }
+ 
+@@ -564,12 +593,18 @@
+ 	void __iomem *regs;
+ 	int ret;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_bind\n");
++
+ 	tv = devm_kzalloc(dev, sizeof(*tv), GFP_KERNEL);
+ 	if (!tv)
+ 		return -ENOMEM;
+ 	tv->drv = drv;
+ 	dev_set_drvdata(dev, tv);
+ 
++	tv->quirks = of_device_get_match_data(dev);
++	if (!tv->quirks)
++		return -EINVAL;
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(dev, res);
+ 	if (IS_ERR(regs)) {
+@@ -652,6 +687,7 @@
+ 			    void *data)
+ {
+ 	struct sun4i_tv *tv = dev_get_drvdata(dev);
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_unbind\n");
+ 
+ 	drm_connector_cleanup(&tv->connector);
+ 	drm_encoder_cleanup(&tv->encoder);
+@@ -665,18 +701,35 @@
+ 
+ static int sun4i_tv_probe(struct platform_device *pdev)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_probe\n");
+ 	return component_add(&pdev->dev, &sun4i_tv_ops);
+ }
+ 
+ static int sun4i_tv_remove(struct platform_device *pdev)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun4i_tv_remove\n");
+ 	component_del(&pdev->dev, &sun4i_tv_ops);
+ 
+ 	return 0;
+ }
+ 
++static const struct sun4i_tv_quirks sun4i_a10_tv_quirks = {
++	/* Nothing special */
++};
++
++static const struct sun4i_tv_quirks sun8i_h3_tv_quirks = {
++	.fixed_divider = 16,
++};
++
+ static const struct of_device_id sun4i_tv_of_table[] = {
+-	{ .compatible = "allwinner,sun4i-a10-tv-encoder" },
++	{
++		.compatible = "allwinner,sun4i-a10-tv-encoder",
++		.data = &sun4i_a10_tv_quirks,
++	},
++	{
++		.compatible = "allwinner,sun8i-h3-tv-encoder",
++		.data = &sun8i_h3_tv_quirks,
++	},
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, sun4i_tv_of_table);
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/drivers/gpu/drm/sun4i/sun8i_mixer.c linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun8i_mixer.c
+--- linux-4.14.y/drivers/gpu/drm/sun4i/sun8i_mixer.c	2018-02-20 10:42:14.000000000 +0800
++++ linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun8i_mixer.c	2018-02-23 09:49:11.710515375 +0800
+@@ -29,6 +29,14 @@
+ #include "sun8i_layer.h"
+ #include "sunxi_engine.h"
+ 
++static const u32 sun8i_rgb2yuv_coef[12] = {
++	0x00000107, 0x00000204, 0x00000064, 0x00004200,
++	0x00001f68, 0x00001ed6, 0x000001c2, 0x00020200,
++	0x000001c2, 0x00001e87, 0x00001fb7, 0x00020200,
++};
++
++static const u32 sun8i_rgb2yuv_dcsc_alpha = 0x00020200;
++
+ static void sun8i_mixer_commit(struct sunxi_engine *engine)
+ {
+ 	DRM_DEBUG_DRIVER("Committing changes\n");
+@@ -37,6 +45,31 @@
+ 		     SUN8I_MIXER_GLOBAL_DBUFF_ENABLE);
+ }
+ 
++static void sun8i_mixer_apply_color_correction(struct sunxi_engine *engine)
++{
++	int i;
++
++	DRM_DEBUG_DRIVER("Applying RGB to YUV color correction\n");
++
++	/* Set color correction */
++	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 1);
++
++	for (i = 0; i < 12; i++)
++		regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_REG(i),
++			     sun8i_rgb2yuv_coef[i]);
++
++	regmap_write(engine->regs, SUN8I_MIXER_DCSC_COEF_ALPHA,
++		     sun8i_rgb2yuv_dcsc_alpha);
++}
++
++static void sun8i_mixer_disable_color_correction(struct sunxi_engine *engine)
++{
++	DRM_DEBUG_DRIVER("Disabling color correction\n");
++
++	/* Disable color correction */
++	regmap_write(engine->regs, SUN8I_MIXER_DCSC_EN, 0);
++}
++
+ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+ 				int layer, bool enable)
+ {
+@@ -154,6 +187,8 @@
+ 	int chan = mixer->cfg->vi_num;
+ 	int ret;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun8i_mixer_update_layer_formats\n");
++
+ 	if (plane->state->crtc)
+ 		interlaced = plane->state->crtc->state->adjusted_mode.flags
+ 			& DRM_MODE_FLAG_INTERLACE;
+@@ -191,6 +226,8 @@
+ 	int chan = mixer->cfg->vi_num;
+ 	int bpp;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun8i_mixer_update_layer_buffer\n");
++
+ 	/* Get the physical address of the buffer in memory */
+ 	gem = drm_fb_cma_get_gem_obj(fb, 0);
+ 
+@@ -229,6 +266,8 @@
+ static const struct sunxi_engine_ops sun8i_engine_ops = {
+ 	.commit		= sun8i_mixer_commit,
+ 	.layers_init	= sun8i_layers_init,
++	.apply_color_correction		= sun8i_mixer_apply_color_correction,
++	.disable_color_correction	= sun8i_mixer_disable_color_correction,
+ };
+ 
+ static struct regmap_config sun8i_mixer_regmap_config = {
+@@ -249,6 +288,8 @@
+ 	void __iomem *regs;
+ 	int i, ret;
+ 
++	DRM_DEBUG_DRIVER("TVE: sun8i_mixer_bind\n");
++
+ 	/*
+ 	 * The mixer uses single 32-bit register to store memory
+ 	 * addresses, so that it cannot deal with 64-bit memory
+@@ -361,6 +402,8 @@
+ {
+ 	struct sun8i_mixer *mixer = dev_get_drvdata(dev);
+ 
++	DRM_DEBUG_DRIVER("TVE: sun8i_mixer_unbind\n");
++
+ 	list_del(&mixer->engine.list);
+ 
+ 	clk_disable_unprepare(mixer->mod_clk);
+@@ -375,11 +418,15 @@
+ 
+ static int sun8i_mixer_probe(struct platform_device *pdev)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun8i_mixer_probe\n");
++
+ 	return component_add(&pdev->dev, &sun8i_mixer_ops);
+ }
+ 
+ static int sun8i_mixer_remove(struct platform_device *pdev)
+ {
++	DRM_DEBUG_DRIVER("TVE: sun8i_mixer_remove\n");
++	
+ 	component_del(&pdev->dev, &sun8i_mixer_ops);
+ 
+ 	return 0;
+diff -Naur -x '*.orig' -x .git -x '.git*' -x '.get*' -x .mailmap -x .cocciconfig --no-dereference linux-4.14.y/drivers/gpu/drm/sun4i/sun8i_mixer.h linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun8i_mixer.h
+--- linux-4.14.y/drivers/gpu/drm/sun4i/sun8i_mixer.h	2018-02-20 00:21:19.000000000 +0800
++++ linux-4.14.y-tve/drivers/gpu/drm/sun4i/sun8i_mixer.h	2018-02-20 19:48:17.968463590 +0800
+@@ -88,6 +88,11 @@
+ #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
+ #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
+ 
++/* The DCSC sub-engine is used to do color space conversation */
++#define SUN8I_MIXER_DCSC_EN			0xb0000
++#define SUN8I_MIXER_DCSC_COEF_REG(x)		(0xb0010 + 0x4 * x)
++#define SUN8I_MIXER_DCSC_COEF_ALPHA		0xb0040
++
+ /*
+  * These sub-engines are still unknown now, the EN registers are here only to
+  * be used to disable these sub-engines.
+@@ -102,7 +107,6 @@
+ #define SUN8I_MIXER_PEAK_EN			0xa6000
+ #define SUN8I_MIXER_ASE_EN			0xa8000
+ #define SUN8I_MIXER_FCC_EN			0xaa000
+-#define SUN8I_MIXER_DCSC_EN			0xb0000
+ 
+ struct sun8i_mixer_cfg {
+ 	int		vi_num;
